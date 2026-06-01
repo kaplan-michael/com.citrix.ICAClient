@@ -1,6 +1,6 @@
 id: com.citrix.ICAClient
 runtime: org.gnome.Platform
-runtime-version: "46" # Requirements as per Citrix's site: https://docs.citrix.com/en-us/citrix-workspace-app-for-linux/system-requirements.html
+runtime-version: "50" # Requirements as per Citrix's site: https://docs.citrix.com/en-us/citrix-workspace-app-for-linux/system-requirements.html
 sdk: org.gnome.Sdk
 command: /app/bin/run.sh
 
@@ -20,6 +20,17 @@ finish-args:
   - --persist=.ICAClient # Log/config directory (relative to the Flatpak container home folder)
 
 modules:
+  - name: libxml2-legacy
+    buildsystem: autotools
+    config-opts:
+      - --disable-static
+      - --without-python
+      - --without-lzma
+    sources:
+      - type: archive
+        url: https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.9.tar.xz
+        sha256: a2c9ae7b770da34860050c309f903221c67830c86e4a7e760692b803df95143a
+
   - name: icaclient
     buildsystem: simple
     build-commands:
@@ -35,7 +46,18 @@ modules:
           exit 1
         fi
 
-        url=$(wget -q -O - https://www.citrix.com/downloads/workspace-app/linux/workspace-app-for-linux-latest.html | sed -ne "/${folder}.*tar.gz/ s/<a .* rel=\"\(.*\)\" id=\"downloadcomponent.*\">/https:\1/p" | sed -e 's/\r//g' | xargs)
+        url=$(
+            wget -q -O - https://www.citrix.com/downloads/workspace-app/betas-and-tech-previews/workspace-app-tp-gcc11-for-linux.html \
+            | grep -oE "(https:)?//downloads\.citrix\.com/[^[:space:]\"<>]*/${folder}-[0-9][^[:space:]\"<>]*\.tar\.gz[^[:space:]\"<>]*" \
+            | sed 's#^//#https://#' \
+            | head -n1
+        )
+
+        if [[ -z "$url" ]]; then
+          echo "Could not find Citrix GCC11 tarball URL for ${folder}"
+          exit 1
+        fi
+
         echo "Downloading Citrix Workspace from ${url}"
         wget -nv "${url}" -O /tmp/linux.tar.gz
 
@@ -70,4 +92,3 @@ modules:
         path: com.citrix.ICAClient.desktop
       - type: file
         path: run.sh
-
